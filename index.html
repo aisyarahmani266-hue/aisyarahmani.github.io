@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="id">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Toko Adila - Kasir & Stok</title>
+
+    <!-- PWA Config Removed -->
+
+    <link rel="icon" type="image/png" href="https://cdn-icons-png.flaticon.com/512/10473/10473619.png">
+
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link rel="stylesheet" href="style.css">
+
+    <script>
+        // Global Error Handler to help user report bugs
+        window.onerror = function (msg, url, line, col, error) {
+            alert("Error System: " + msg + "\nLine: " + line);
+            return false;
+        };
+
+        // Unregister any existing Service Workers to revert PWA
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.getRegistrations().then(function (registrations) {
+                for (let registration of registrations) {
+                    registration.unregister();
+                    console.log('Service Worker unregistered');
+                }
+            });
+        }
+    </script>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <nav class="sidebar">
+            <div class="brand">
+                <i data-lucide="store" class="brand-icon"></i>
+                <h1>Toko Adila</h1>
+            </div>
+
+            <ul class="nav-links">
+                <li class="active" onclick="showPage('cashier')">
+                    <i data-lucide="shopping-cart"></i>
+                    <span>Kasir</span>
+                </li>
+                <li onclick="showPage('inventory')">
+                    <i data-lucide="package"></i>
+                    <span>Barang</span>
+                </li>
+                <li onclick="showPage('reports')">
+                    <i data-lucide="bar-chart-3"></i>
+                    <span>Laporan</span>
+                </li>
+            </ul>
+        </nav>
+
+        <!-- Main Content -->
+        <main class="main-content">
+
+            <!-- PAGE: CASHIER -->
+            <section id="page-cashier" class="page active">
+                <div class="cashier-layout">
+                    <!-- Left: Product Selection -->
+                    <div class="product-section">
+                        <div class="search-bar">
+                            <div style="display: flex; gap: 8px; width: 100%;">
+                                <input type="text" id="cashier-input-code" placeholder="Ketik Kode / Nama Barang..."
+                                    autofocus style="flex: 1;">
+                                <button class="btn-primary" onclick="addToCartByInput()"
+                                    style="width: auto; padding: 0 15px;">
+                                    <i data-lucide="plus"></i> <span class="mobile-hidden">Tambah</span>
+                                </button>
+                                <button class="btn-secondary" onclick="startScanner()"
+                                    style="width: auto; padding: 0 15px;">
+                                    <i data-lucide="scan-barcode"></i> <span class="mobile-hidden">Scan</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="categories" id="category-list">
+                            <button class="cat-btn active" onclick="filterCategory('all')">Semua</button>
+                            <button class="cat-btn" onclick="filterCategory('persabunan')">Persabunan</button>
+                            <button class="cat-btn" onclick="filterCategory('minuman')">Minuman</button>
+                            <button class="cat-btn" onclick="filterCategory('makanan')">Makanan/Snack</button>
+                            <button class="cat-btn" onclick="filterCategory('bahan')">Bahan</button>
+                            <button class="cat-btn" onclick="filterCategory('bumbu')">Bumbu</button>
+                            <button class="cat-btn" onclick="filterCategory('pulsa')">Pulsa</button>
+                            <button class="cat-btn" onclick="filterCategory('token')">Token PLN</button>
+                        </div>
+
+                        <div class="product-grid" id="product-grid-container">
+                            <!-- Products injected by JS -->
+                        </div>
+                    </div>
+
+                    <!-- Right: Cart/Order -->
+                    <div class="cart-section">
+                        <div class="cart-header" onclick="toggleMobileCart()">
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <h2>Pesanan</h2>
+                                <i id="mobile-cart-toggle-icon" data-lucide="chevron-up" class="mobile-only"></i>
+                            </div>
+                            <button class="btn-danger-text"
+                                onclick="clearCart(); event.stopPropagation()">Reset</button>
+                        </div>
+                        <div class="cart-items" id="cart-items-container">
+                            <!-- Cart Items injected by JS -->
+                            <div class="empty-state">Belum ada pesanan</div>
+                        </div>
+                        <div class="cart-footer">
+                            <div class="total-row">
+                                <span>Total</span>
+                                <span class="total-price" id="cart-total-display">Rp 0</span>
+                            </div>
+                            <div style="display: flex; gap: 8px;">
+                                <button class="btn-checkout" style="flex: 1; background-color: #ffcc80; color: #5d4037;"
+                                    onclick="processCheckout('hutang')">
+                                    <i data-lucide="clipboard-list"></i> Hutang
+                                </button>
+                                <button class="btn-checkout" style="flex: 1;" onclick="processCheckout('lunas')">
+                                    <i data-lucide="banknote"></i> Bayar
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- PAGE: INVENTORY -->
+            <section id="page-inventory" class="page">
+                <div class="page-header">
+                    <h2>Manajemen Barang</h2>
+                    <button class="btn-primary" onclick="openProductModal()">
+                        <i data-lucide="plus-circle"></i> Tambah Barang
+                    </button>
+                </div>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Kode</th>
+                                <th>Nama</th>
+                                <th>Kategori</th>
+                                <th>Harga</th>
+                                <th>Stok</th>
+                                <th>Aksi</th>
+                            </tr>
+                        </thead>
+                        <tbody id="inventory-table-body">
+                            <!-- Inventory Rows -->
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- PAGE: REPORTS -->
+            <section id="page-reports" class="page">
+                <div class="page-header">
+                    <h2>Laporan Penjualan</h2>
+                    <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                        <button class="btn-primary" onclick="showDatabaseModal()"
+                            style="background-color: #64b5f6; color: white;">
+                            <i data-lucide="database"></i> Data
+                        </button>
+                        <button class="btn-primary" onclick="exportReportToPDF()"
+                            style="background-color: #ff8a65; color: white;">
+                            <i data-lucide="file-text"></i> PDF
+                        </button>
+                        <button class="btn-primary" onclick="exportReportToCSV()">
+                            <i data-lucide="download"></i> Excel/CSV
+                        </button>
+                    </div>
+                </div>
+                <div style="margin-bottom: 20px;">
+                    <select id="report-month-filter" onchange="renderReports()"
+                        style="padding: 8px; border-radius: 8px;">
+                        <option value="all">Semua Waktu</option>
+                        <!-- Month options injected by JS -->
+                    </select>
+                </div>
+                <div class="stats-card">
+                    <h3>Total Pendapatan (Bulan Ini)</h3>
+                    <h1 id="report-total-revenue">Rp 0</h1>
+                </div>
+                <!-- Debt Section -->
+                <div class="report-section" style="margin-bottom: 2rem;">
+                    <h3 style="color: #d84315; margin-bottom: 1rem;">Daftar Piutang (Belum Bayar)</h3>
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Tanggal</th>
+                                    <th>Pembeli</th>
+                                    <th>Items</th>
+                                    <th>Total</th>
+                                    <th>Aksi</th>
+                                </tr>
+                            </thead>
+                            <tbody id="report-hutang-body">
+                                <!-- Debts rendered here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Paid Section -->
+                <div class="report-section">
+                    <h3 style="color: #2e7d32; margin-bottom: 1rem;">Laporan Penjualan (Lunas)</h3>
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Tanggal</th>
+                                    <th>Waktu</th>
+                                    <th>Pembeli</th>
+                                    <th>Total Item</th>
+                                    <th>Total Harga</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="report-lunas-body">
+                                <!-- Paid/Lunas rendered here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+        </main>
+    </div>
+
+    <!-- MODAL: ADD/EDIT PRODUCT -->
+    <div id="product-modal" class="modal hidden">
+        <div class="modal-content">
+            <h3 id="modal-title">Tambah Barang</h3>
+            <form id="product-form" onsubmit="handleProductSubmit(event)">
+                <input type="hidden" id="edit-product-id">
+
+                <div class="form-group">
+                    <label>Kode Barang (Otomatis)</label>
+                    <input type="text" id="prod-code" required readonly
+                        style="background-color: #f0f0f0; cursor: not-allowed;">
+                </div>
+                <div class="form-group">
+                    <label>Nama Barang</label>
+                    <input type="text" id="prod-name" required>
+                </div>
+                <div class="form-group">
+
+                    <div class="form-group">
+                        <label>Kategori</label>
+                        <select id="prod-category">
+                            <option value="persabunan">Persabunan</option>
+                            <option value="minuman">Minuman</option>
+                            <option value="makanan">Makanan/Snack</option>
+                            <option value="bahan">Bahan Makanan</option>
+                            <option value="bumbu">Bumbu</option>
+                            <option value="pulsa">Pulsa</option>
+                            <option value="token">Token PLN</option>
+                            <option value="lainnya">Lainnya</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Harga (Rp)</label>
+                        <input type="number" id="prod-price" required min="0">
+                    </div>
+                    <div class="form-group">
+                        <label>Stok</label>
+                        <input type="number" id="prod-stock" value="100" min="0">
+                    </div>
+
+                    <div class="modal-actions">
+                        <button type="button" class="btn-secondary" onclick="closeProductModal()">Batal</button>
+                        <button type="submit" class="btn-primary">Simpan</button>
+                    </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL: PAYMENT / CHANGE CALCULATOR -->
+    <div id="payment-modal" class="modal hidden">
+        <div class="modal-content" style="width: 400px;">
+            <h3 style="margin-bottom: 20px;">Pembayaran</h3>
+
+            <!-- Total Bill -->
+            <div
+                style="background: #fdfbf7; padding: 15px; border-radius: 12px; text-align: center; margin-bottom: 20px;">
+                <span style="display: block; font-size: 0.9rem; color: #666;">Total Tagihan</span>
+                <span id="pay-modal-total" style="font-size: 1.8rem; font-weight: 600; color: #2d5a4c;">Rp 0</span>
+            </div>
+
+            <div class="form-group">
+                <label>Uang Diterima (Rp)</label>
+                <input type="number" id="pay-money-received" placeholder="0"
+                    style="font-size: 1.2rem; padding: 12px; font-weight: 500;" oninput="calculateChange()" autofocus>
+            </div>
+
+            <!-- Quick Cash Buttons -->
+            <div style="display: flex; gap: 8px; margin-bottom: 15px; flex-wrap: wrap;">
+                <button type="button" class="btn-secondary" onclick="setCashReceived('pas')"
+                    style="flex:1; font-size:0.8rem;">Uang Pas</button>
+                <button type="button" class="btn-secondary" onclick="setCashReceived(20000)"
+                    style="flex:1; font-size:0.8rem;">20k</button>
+                <button type="button" class="btn-secondary" onclick="setCashReceived(50000)"
+                    style="flex:1; font-size:0.8rem;">50k</button>
+                <button type="button" class="btn-secondary" onclick="setCashReceived(100000)"
+                    style="flex:1; font-size:0.8rem;">100k</button>
+            </div>
+
+            <!-- Change Display -->
+            <div class="form-group">
+                <label>Kembalian</label>
+                <div id="pay-change-display" style="font-size: 1.2rem; font-weight: 600; color: #888;">Rp 0</div>
+            </div>
+
+            <div class="modal-actions">
+                <button type="button" class="btn-secondary" onclick="closePaymentModal()">Batal</button>
+                <button type="button" class="btn-primary" onclick="finalizePayment()">
+                    <i data-lucide="check-circle"></i> Proses Bayar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: DATABASE MANAGER -->
+    <div id="database-modal" class="modal hidden">
+        <div class="modal-content" style="width: 600px;">
+            <h3>Data Toko (Database)</h3>
+            <p style="margin-bottom: 15px; font-size: 0.9rem; color: #666;">
+                Ini adalah data mentah aplikasi anda. Anda bisa menyalinnya untuk backup.
+            </p>
+
+            <div class="form-group">
+                <textarea id="db-json-view" rows="10"
+                    style="width: 100%; padding: 10px; font-family: monospace; font-size: 0.8rem; border: 1px solid #ccc; border-radius: 8px;"
+                    readonly></textarea>
+            </div>
+
+            <div class="modal-actions">
+                <button class="btn-secondary" onclick="closeDatabaseModal()">Tutup</button>
+                <button class="btn-primary" onclick="copyDatabaseData()">
+                    <i data-lucide="copy"></i> Salin Data
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: BARCODE SCANNER -->
+    <div id="scanner-modal" class="modal hidden">
+        <div class="modal-content" style="width: 500px;">
+            <h3>Scan Barcode Barang</h3>
+            <div id="reader" style="width: 100%; min-height: 300px; background: #000; margin-bottom: 15px;"></div>
+            <p style="text-align: center; color: #666; font-size: 0.9rem;">Arahkan kamera ke barcode produk</p>
+            <div class="modal-actions">
+                <button class="btn-secondary" onclick="stopScanner()">Tutup</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- HTML5-QRCode Library (Stable Version) -->
+    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+
+    <!-- jsPDF & AutoTable -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+
+    <script src="data.js?v=revert2"></script>
+    <script src="db.js?v=revert2"></script>
+    <script src="script.js?v=revert2"></script>
+    <script>
+        lucide.createIcons();
+    </script>
+</body>
+
+</html>
